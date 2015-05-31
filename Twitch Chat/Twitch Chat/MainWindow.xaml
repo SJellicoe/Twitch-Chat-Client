@@ -1,0 +1,59 @@
+﻿<Window x:Class="Twitch_Chat.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="MainWindow" Height="350" Width="255">
+    <Grid>
+        <TabControl>
+            <TabItem Header="Chat">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="10" />
+                        <RowDefinition Height="50" />
+                    </Grid.RowDefinitions>
+                    <TextBox Grid.Row="0" Name="receivedText" TextWrapping="Wrap" BorderBrush="Gray" BorderThickness="2" IsReadOnly="True"/>
+                    <TextBox Grid.Row="2" Name="sendTextBox" TextWrapping="Wrap" BorderBrush="Gray" BorderThickness="2" PreviewKeyUp="Send"/>
+                </Grid>
+            </TabItem>
+            <TabItem Header="Channel">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="10" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <DockPanel Grid.Row="0" Grid.Column="0">
+                    <Label Height="30" VerticalAlignment="Top" >Channel Name:</Label>
+                    <TextBox Name="channelTextBox" Height="30" VerticalAlignment="Top"/>
+                    </DockPanel>
+                    
+                    <Button Grid.Row="2" Width="50" Height="25" HorizontalAlignment="Center" Click="Join">Join</Button>
+                </Grid>
+            </TabItem>
+            <TabItem Header="Credentials">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="10" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <DockPanel Grid.Row="0">
+                        <Label Height="30" VerticalAlignment="Top" >Username:</Label>
+                        <TextBox Name="usernameTextBox" Height="30" VerticalAlignment="Top" Text="{Binding Source={StaticResource Settings}, Path=Default.Username}" />
+                    </DockPanel>
+                    <DockPanel Grid.Row="1">
+                        <Label Height="30" VerticalAlignment="Top" >oauth Key:</Label>
+                        <PasswordBox Name="oauthTextBox" Height="30" VerticalAlignment="Top"/>
+                    </DockPanel>
+
+                    <Button Grid.Row="3" Width="50" Height="25" HorizontalAlignment="Center" Click="Save" >Save</Button>
+
+
+                </Grid>
+            </TabItem>
+        </TabControl>
+        
+    </Grid>
+
+</Window>
