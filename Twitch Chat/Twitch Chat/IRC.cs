@@ -50,6 +50,7 @@ namespace Twitch_Chat
                 {
                     buffer = await Receive();
                 } while (buffer != "" && !buffer.Contains(":tmi.twitch.tv 376 " + _username + " :"));
+
                 if (buffer.Contains(":tmi.twitch.tv 376 " + _username + " :"))
                 {
                     success = true;
@@ -71,12 +72,10 @@ namespace Twitch_Chat
                     do
                     {
                         buffer = await Receive();
-                    } while (!buffer.Contains("PART #" + channelName) && buffer != "");
+                    } while (!buffer.Contains("PART #" + _channel) && buffer != "");
                     success = true;
                 }
             }
-
-            _channel = channelName;
 
             if(await Send("JOIN #" + channelName + "\r\n"))
             {
@@ -84,7 +83,9 @@ namespace Twitch_Chat
                 {
                     buffer = await Receive();
                 } while (buffer != "" && buffer.Contains(":jtv MODE #" + channelName +" +o"));
+
                 success = true;
+                _channel = channelName;
             }
 
             return success;
@@ -150,10 +151,6 @@ namespace Twitch_Chat
                     {
                         throw;
                     }
-                }
-                catch (Exception)
-                {
-
                 }
             }
 
