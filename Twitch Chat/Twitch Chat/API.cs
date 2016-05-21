@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Configuration;
 using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -25,7 +26,7 @@ namespace Twitch_Chat
                 webClient.DefaultRequestHeaders.Accept.Clear();
                 webClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
-                HttpResponseMessage response = webClient.GetAsync("?oauth_token=" + Properties.Settings.Default.OAuth).Result;
+                HttpResponseMessage response = webClient.GetAsync("?oauth_token=" + ConfigurationManager.AppSettings["oauth"]).Result;
 
                 if (response.IsSuccessStatusCode)
                 {

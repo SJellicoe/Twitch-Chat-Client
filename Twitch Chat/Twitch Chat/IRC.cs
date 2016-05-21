@@ -1,47 +1,56 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
+using System.Configuration;
 using System.Net.Sockets;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Twitch_Chat
 {
     class IRC
     {
-        private int port = 6667;
-        private string server = "irc.twitch.tv";
-        public string channel { get; set; }
-        private Socket sock;
+        private const int PORT = 6667;
+        private const string SERVER = "irc.chat.twitch.tv";
+        private TcpClient _client;
+        private NetworkStream _stream;
+        private string _username = "";
+        private string _channel = "";
+        public string Channel
+        {
+            get { return _channel; }
+        }
+
 
         public IRC()
         {
             
         }
 
-        public bool Connect()
+        public async Task<bool> Connect()
         {
             bool success = false;
             string buffer;
 
+            _username = ConfigurationManager.AppSettings["username"];
+
             try
             {
-                sock = new Socket(SocketType.Stream, ProtocolType.Tcp);
-                sock.Connect(server, port);
-                sock.ReceiveTimeout = 1000;
+                _client = new TcpClient(SERVER, PORT);
+                _stream = _client.GetStream();
             }
-            catch(Exception e)
+            catch(Exception)
             {
+                return success;
             }
 
 
-            if (Send("PASS oauth:" + Properties.Settings.Default.OAuth + "\r\n" + "NICK " + Properties.Settings.Default.Username + "\r\n"))
+            if (await Send("PASS oauth:" + ConfigurationManager.AppSettings["oauth"]) && await Send("NICK " + _username))
             {
                 do
                 {
-                    buffer = Receive();
-                } while (buffer != "" && !buffer.Contains(":tmi.twitch.tv 376 " + Properties.Settings.Default.Username + " :"));
-                if (buffer.Contains(":tmi.twitch.tv 376 " + Properties.Settings.Default.Username + " :"))
+                    buffer = await Receive();
+                } while (buffer != "" && !buffer.Contains(":tmi.twitch.tv 376 " + _username + " :"));
+                if (buffer.Contains(":tmi.twitch.tv 376 " + _username + " :"))
                 {
                     success = true;
                 }
@@ -50,31 +59,30 @@ namespace Twitch_Chat
             return success;
         }
 
-        public bool JoinChannel(string channelName)
+        public async Task<bool> JoinChannel(string channelName)
         {
             bool success = false;
             string buffer;
-            ASCIIEncoding encoder = new ASCIIEncoding();
 
-            if (channel != "")
+            if (_channel != "")
             {
-                if (Send("PART #" + channelName + "\r\n"))
+                if (await Send("PART #" + _channel + "\r\n"))
                 {
                     do
                     {
-                        buffer = Receive();
-                    } while (buffer != "" && buffer.Contains("PART #" + channelName));
+                        buffer = await Receive();
+                    } while (!buffer.Contains("PART #" + channelName) && buffer != "");
                     success = true;
                 }
             }
 
-            channel = channelName;
+            _channel = channelName;
 
-            if(Send("JOIN #" + channelName + "\r\n"))
+            if(await Send("JOIN #" + channelName + "\r\n"))
             {
                 do
                 {
-                    buffer = Receive();
+                    buffer = await Receive();
                 } while (buffer != "" && buffer.Contains(":jtv MODE #" + channelName +" +o"));
                 success = true;
             }
@@ -82,33 +90,33 @@ namespace Twitch_Chat
             return success;
         }
 
-        public bool Send(string message)
+        public async Task<bool> Send(string message)
         {
             bool success = false;
             byte[] send;
-            ASCIIEncoding encoder = new ASCIIEncoding();
 
-            if (sock.Connected)
+            if (_client.Connected)
             {
                 try
                 {
-                    send = encoder.GetBytes(message + "\r\n");
-                    sock.Send(send);
+                    send = Encoding.UTF8.GetBytes(message + "\r\n");
+                    await _stream.WriteAsync(send, 0, send.Length);
                     success = true;
                 }
-                catch(Exception e)
+                catch(Exception)
                 {
+
                 }
             }
 
             return success;
         }
 
-        public bool SendMessage(string message)
+        public async Task<bool> SendMessage(string message)
         {
             bool success = false;
 
-            if(Send("PRIVMSG #" + channel + " :" + message))
+            if(await Send("PRIVMSG #" + _channel + " :" + message))
             {
                 success = true;
             }
@@ -116,22 +124,36 @@ namespace Twitch_Chat
             return success;
         }
 
-        public string Receive()
+        public async Task<string> Receive()
+        {
+            return await Receive(CancellationToken.None);
+        }
+
+        public async Task<string> Receive(CancellationToken token)
         {
             byte[] receive = new byte[16384];
             string buffer = "";
-            ASCIIEncoding encoder = new ASCIIEncoding();
 
-            if (sock.Connected)
+            if (_client.Connected)
             {
                 try
                 {
-                    sock.Receive(receive);
-                    buffer = encoder.GetString(receive);
-                    buffer = buffer.TrimEnd('\0');
+                    using (token.Register(() => _stream.Close()))
+                    {
+                        int numBytes = await _stream.ReadAsync(receive, 0, receive.Length, token);
+                        buffer = Encoding.UTF8.GetString(receive, 0, numBytes);
+                    }
                 }
-                catch(Exception e)
+                catch (ObjectDisposedException)
                 {
+                    if (!await Connect())
+                    {
+                        throw;
+                    }
+                }
+                catch (Exception)
+                {
+
                 }
             }
 
