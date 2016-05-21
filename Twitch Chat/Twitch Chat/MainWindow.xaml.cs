@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Configuration;
 using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -25,7 +26,9 @@ namespace Twitch_Chat
     public partial class MainWindow : Window
     {
         private IRC irc = new IRC();
-        private Thread listen;
+        private Task _listen;
+        private CancellationTokenSource _tokenSource;
+        private CancellationToken _cancellationToken;
 
         public MainWindow()
         {
@@ -35,59 +38,61 @@ namespace Twitch_Chat
         }
 
 
-        private void Send(object sender, KeyEventArgs e)
+        private async void Send(object sender, KeyEventArgs e)
         {
             if(e.Key == Key.Enter)
             {
-                if(irc.SendMessage(sendTextBox.Text))
+                if(await irc.SendMessage(sendTextBox.Text))
                 {
+                    UpdateText(usernameTextBox.Text + ": " + sendTextBox.Text);
                     sendTextBox.Text = "";
                 }
             }
         }
 
-        private void Join(object sender, RoutedEventArgs e)
+        private async void Join(object sender, RoutedEventArgs e)
         {
-            if (listen != null)
+            if (_listen != null)
             {
-                if (listen.IsAlive)
-                {
-                    listen.Abort();
-                }
+                _tokenSource.Cancel();
+                await Task.Delay(1000);
             }
-            irc.JoinChannel(channelTextBox.Text);
-            listen = new Thread (new ThreadStart(Listen));
-            listen.Start();
+            if(await irc.JoinChannel(channelTextBox.Text))
+            {
+                _tokenSource = new CancellationTokenSource();
+                _cancellationToken = _tokenSource.Token;
+                _listen = Task.Factory.StartNew(Listen, _cancellationToken);
+            }
         }
 
         protected override void OnClosed(EventArgs e)
         {
-            if (listen != null)
+            if (_listen != null)
             {
-                if (listen.IsAlive)
+                if (!_listen.IsCanceled)
                 {
-                    listen.Abort();
+                    _tokenSource.Cancel();
                 }
             }
             base.OnClosed(e);
         }
 
 
-        public void Listen()
+        public async Task Listen()
         {
             string message = "";
             string username = "";
             
-            while (true)
+            while (!_cancellationToken.IsCancellationRequested)
             {
-                message = irc.Receive();
+                message = await irc.Receive(_cancellationToken);
                 if (message != "" && message != "PING :tmi.twitch.tv\r\n")
                 {
                     if (message.Contains(".tmi.twitch.tv PRIVMSG #"))
                     {
                         username = message.Substring(message.IndexOf(':') + 1, message.IndexOf('!') - 1);
                         message = message.Remove(0, message.IndexOf(".tmi.twitch.tv PRIVMSG #"));
-                        message = message.Replace(".tmi.twitch.tv PRIVMSG #" + irc.channel + " :", ": ");
+                        message = message.Replace(".tmi.twitch.tv PRIVMSG #" + irc.Channel + " :", ": ");
                         message = username + message;
                     }
                     else if (message.Contains(".tmi.twitch.tv PART #"))
@@ -115,7 +120,7 @@ namespace Twitch_Chat
                 else if(message.IndexOf("PING :tmi.twitch.tv") == 0)
                 {
                     message = message.Replace("PING", "PONG");
-                    if (!irc.Send(message))
+                    if (!await irc.Send(message))
                     {
                         message = "Failed to respond to PING.";
                         break;
@@ -135,17 +140,30 @@ namespace Twitch_Chat
 
         private void Save(object sender, RoutedEventArgs e)
         {
-            Properties.Settings.Default.Username = usernameTextBox.Text;
-            Properties.Settings.Default.OAuth = oauthTextBox.Password;
-            Properties.Settings.Default.Save();
+            Dictionary<string, string> settings = new Dictionary<string, string>();
+            settings.Add("username", usernameTextBox.Text);
+            settings.Add("oauth", oauthTextBox.Password);
+            UpdateSettings(settings);
         }
 
         private void LoadSettings()
         {
-            usernameTextBox.Text = Properties.Settings.Default.Username;
-            oauthTextBox.Password = Properties.Settings.Default.OAuth;
+            usernameTextBox.Text = ConfigurationManager.AppSettings["username"];
+            oauthTextBox.Password = ConfigurationManager.AppSettings["oauth"];
         }
         
+        private void UpdateSettings(Dictionary<string, string> keys)
+        {
+            Configuration configuration = ConfigurationManager.OpenExeConfiguration(ConfigurationUserLevel.None);
 
+            foreach (KeyValuePair<string, string> kvp in keys)
+            {
+                configuration.AppSettings.Settings[kvp.Key].Value = kvp.Value;
+            }
+
+            configuration.Save();
+
+            ConfigurationManager.RefreshSection("appSettings");
+        }
     }
 }

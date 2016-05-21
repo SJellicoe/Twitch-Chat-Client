@@ -40,7 +40,7 @@
                     </Grid.RowDefinitions>
                     <DockPanel Grid.Row="0">
                         <Label Height="30" VerticalAlignment="Top" >Username:</Label>
-                        <TextBox Name="usernameTextBox" Height="30" VerticalAlignment="Top" Text="{Binding Source={StaticResource Settings}, Path=Default.Username}" />
+                        <TextBox Name="usernameTextBox" Height="30" VerticalAlignment="Top" />
                     </DockPanel>
                     <DockPanel Grid.Row="1">
                         <Label Height="30" VerticalAlignment="Top" >oauth Key:</Label>
