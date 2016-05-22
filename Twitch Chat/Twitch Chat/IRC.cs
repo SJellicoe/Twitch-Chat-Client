@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace Twitch_Chat
 {
-    class IRC
+    public class IRC
     {
         private const int PORT = 6667;
         private const string SERVER = "irc.chat.twitch.tv";
@@ -44,14 +44,11 @@ namespace Twitch_Chat
             }
 
 
-            if (await Send("PASS oauth:" + ConfigurationManager.AppSettings["oauth"]) && await Send("NICK " + _username))
+            if (await Send($"PASS oauth:{ConfigurationManager.AppSettings["oauth"]}") && await Send($"NICK {_username}"))
             {
-                do
-                {
-                    buffer = await Receive();
-                } while (buffer != "" && !buffer.Contains(":tmi.twitch.tv 376 " + _username + " :"));
+                buffer = await Receive();
 
-                if (buffer.Contains(":tmi.twitch.tv 376 " + _username + " :"))
+                if (buffer.Contains($":tmi.twitch.tv 376 {_username} :"))
                 {
                     success = true;
                 }
@@ -67,25 +64,27 @@ namespace Twitch_Chat
 
             if (_channel != "")
             {
-                if (await Send("PART #" + _channel + "\r\n"))
+                if (await Send($"PART #{_channel}\r\n"))
                 {
-                    do
-                    {
-                        buffer = await Receive();
-                    } while (!buffer.Contains("PART #" + _channel) && buffer != "");
-                    success = true;
+                    buffer = await Receive();
                 }
             }
 
             if(await Send("JOIN #" + channelName + "\r\n"))
             {
-                do
-                {
-                    buffer = await Receive();
-                } while (buffer != "" && buffer.Contains(":jtv MODE #" + channelName +" +o"));
+                buffer = await Receive();
 
-                success = true;
-                _channel = channelName;
+                if (buffer != "" && buffer.Contains(".tmi.twitch.tv 353") &&
+                buffer.Contains(".tmi.twitch.tv 366") && buffer.Contains("End of /NAMES list"))
+                {
+                    success = true;
+                    _channel = channelName;
+                }
+            }
+
+            if(await Send("CAP REQ :twitch.tv/membership"))
+            {
+                buffer = await Receive();
             }
 
             return success;
@@ -117,7 +116,7 @@ namespace Twitch_Chat
         {
             bool success = false;
 
-            if(await Send("PRIVMSG #" + _channel + " :" + message))
+            if(await Send($"PRIVMSG #{_channel} :{message}"))
             {
                 success = true;
             }

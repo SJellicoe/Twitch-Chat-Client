@@ -1,21 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Configuration;
+using System.Diagnostics;
 using System.Linq;
-using System.Net.Http;
-using System.Net.Http.Headers;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
 using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
 using System.Windows.Threading;
 
 namespace Twitch_Chat
@@ -26,9 +17,12 @@ namespace Twitch_Chat
     public partial class MainWindow : Window
     {
         private IRC irc = new IRC();
+        private API api = new API();
         private Task _listen;
         private CancellationTokenSource _tokenSource;
         private CancellationToken _cancellationToken;
+        Uri RedirectUrl;
+        private string _accessToken = "";
 
         public MainWindow()
         {
@@ -40,11 +34,24 @@ namespace Twitch_Chat
 
         private async void Send(object sender, KeyEventArgs e)
         {
-            if(e.Key == Key.Enter)
+            if (e.Key == Key.Enter)
             {
-                if(await irc.SendMessage(sendTextBox.Text))
+                string message = sendTextBox.Text;
+                if (message.StartsWith("/api|"))
                 {
-                    UpdateText(usernameTextBox.Text + ": " + sendTextBox.Text);
+                    message = message.Replace("/api|", "");
+                    var messageValues = new List<string>(message.Split('|'));
+
+                    string endpoint = messageValues.FirstOrDefault();
+                    messageValues.Remove(endpoint);
+
+                    string value = string.Join("|", messageValues.ToArray());
+                    
+                    await api.CallMethod(endpoint, value, _accessToken);
+                }
+                else if (await irc.SendMessage(message))
+                {
+                    UpdateText($"{usernameTextBox.Text}: {message}");
                     sendTextBox.Text = "";
                 }
             }
@@ -57,7 +64,7 @@ namespace Twitch_Chat
                 _tokenSource.Cancel();
                 await Task.Delay(1000);
             }
-            if(await irc.JoinChannel(channelTextBox.Text))
+            if (await irc.JoinChannel(channelTextBox.Text))
             {
                 _tokenSource = new CancellationTokenSource();
                 _cancellationToken = _tokenSource.Token;
@@ -82,7 +89,7 @@ namespace Twitch_Chat
         {
             string message = "";
             string username = "";
-            
+
             while (!_cancellationToken.IsCancellationRequested)
             {
                 message = await irc.Receive(_cancellationToken);
@@ -104,20 +111,20 @@ namespace Twitch_Chat
                     {
                         username = message.Substring(message.IndexOf(':') + 1, message.IndexOf('!') - 1);
                         message = username + "has joined the chat.";
-                    } 
-                    ThreadStart start = delegate()
+                    }
+                    ThreadStart start = delegate ()
                     {
                         DispatcherOperation operation = Dispatcher.BeginInvoke(DispatcherPriority.Normal,
                           new Action<string>(UpdateText), message);
                         DispatcherOperationStatus status = operation.Status;
                         while (status != DispatcherOperationStatus.Completed)
                         {
-                            status = operation.Wait(TimeSpan.FromMilliseconds(500));
+                            status = operation.Wait(TimeSpan.FromMilliseconds(100));
                         }
                     };
                     new Thread(start).Start();
                 }
-                else if(message.IndexOf("PING :tmi.twitch.tv") == 0)
+                else if (message.IndexOf("PING :tmi.twitch.tv") == 0)
                 {
                     message = message.Replace("PING", "PONG");
                     if (!await irc.Send(message))
@@ -151,7 +158,7 @@ namespace Twitch_Chat
             usernameTextBox.Text = ConfigurationManager.AppSettings["username"];
             oauthTextBox.Password = ConfigurationManager.AppSettings["oauth"];
         }
-        
+
         private void UpdateSettings(Dictionary<string, string> keys)
         {
             Configuration configuration = ConfigurationManager.OpenExeConfiguration(ConfigurationUserLevel.None);
@@ -164,6 +171,24 @@ namespace Twitch_Chat
             configuration.Save();
 
             ConfigurationManager.RefreshSection("appSettings");
+        }
+
+        private async void Connect(object sender, RoutedEventArgs e)
+        {
+            string endpoint = $"https://api.twitch.tv/kraken/oauth2/authorize?response_type=token&client_id={ConfigurationManager.AppSettings["clientId"]}&redirect_uri=http://twitch.chat.localhost&scope=channel_editor&force_verify=true";
+            browser.Navigate(endpoint);
+
+        }
+
+        private void OnBrowserNavigating(object sender, System.Windows.Navigation.NavigatingCancelEventArgs e)
+        {
+            if (e.Uri != null)
+            {
+                if (e.Uri.Fragment.Contains("#access_token"))
+                {
+                    _accessToken = e.Uri.Fragment.Split('&')[0].Split('=')[1];
+                }
+            }
         }
     }
 }
