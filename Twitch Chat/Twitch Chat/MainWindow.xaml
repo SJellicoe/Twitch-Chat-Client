@@ -48,8 +48,16 @@
                     </DockPanel>
 
                     <Button Grid.Row="3" Width="50" Height="25" HorizontalAlignment="Center" Click="Save" >Save</Button>
-
-
+                </Grid>
+            </TabItem>
+            <TabItem Header="API">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Button Grid.Row="0" Click="Connect">Connect</Button>
+                    <WebBrowser Grid.Row="1" Name="browser" Navigating="OnBrowserNavigating"/>
                 </Grid>
             </TabItem>
         </TabControl>
