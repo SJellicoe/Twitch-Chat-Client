@@ -26,7 +26,7 @@ namespace Twitch_Chat
         public MainWindow()
         {
             InitializeComponent();
-            irc.Connect().RunSynchronously();
+            irc.Connect();
             LoadSettings();
         }
 
