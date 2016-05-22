@@ -21,13 +21,12 @@ namespace Twitch_Chat
         private Task _listen;
         private CancellationTokenSource _tokenSource;
         private CancellationToken _cancellationToken;
-        Uri RedirectUrl;
         private string _accessToken = "";
 
         public MainWindow()
         {
             InitializeComponent();
-            irc.Connect();
+            irc.Connect().RunSynchronously();
             LoadSettings();
         }
 
@@ -173,11 +172,10 @@ namespace Twitch_Chat
             ConfigurationManager.RefreshSection("appSettings");
         }
 
-        private async void Connect(object sender, RoutedEventArgs e)
+        private void Connect(object sender, RoutedEventArgs e)
         {
             string endpoint = $"https://api.twitch.tv/kraken/oauth2/authorize?response_type=token&client_id={ConfigurationManager.AppSettings["clientId"]}&redirect_uri=http://twitch.chat.localhost&scope=channel_editor&force_verify=true";
             browser.Navigate(endpoint);
-
         }
 
         private void OnBrowserNavigating(object sender, System.Windows.Navigation.NavigatingCancelEventArgs e)
