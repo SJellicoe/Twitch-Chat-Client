@@ -22,11 +22,11 @@ namespace Twitch_Chat
         private CancellationTokenSource _tokenSource;
         private CancellationToken _cancellationToken;
         private string _accessToken = "";
+        private bool _firstJoin = true;
 
         public MainWindow()
         {
             InitializeComponent();
-            irc.Connect();
             LoadSettings();
         }
 
@@ -65,9 +65,15 @@ namespace Twitch_Chat
             }
             if (await irc.JoinChannel(channelTextBox.Text))
             {
+                UpdateText($"Joined Channel #{channelTextBox.Text}");
                 _tokenSource = new CancellationTokenSource();
                 _cancellationToken = _tokenSource.Token;
                 _listen = Task.Factory.StartNew(Listen, _cancellationToken);
+            }
+            if(_firstJoin)
+            {
+                Join(sender, e);
+                _firstJoin = false;
             }
         }
 
@@ -88,6 +94,12 @@ namespace Twitch_Chat
         {
             string message = "";
             string username = "";
+            
+            if (await irc.Send("CAP REQ :twitch.tv/membership"))
+            {
+                message = await irc.Receive();
+                UpdateTextThread(message);
+            }
 
             while (!_cancellationToken.IsCancellationRequested)
             {
@@ -111,17 +123,7 @@ namespace Twitch_Chat
                         username = message.Substring(message.IndexOf(':') + 1, message.IndexOf('!') - 1);
                         message = username + "has joined the chat.";
                     }
-                    ThreadStart start = delegate ()
-                    {
-                        DispatcherOperation operation = Dispatcher.BeginInvoke(DispatcherPriority.Normal,
-                          new Action<string>(UpdateText), message);
-                        DispatcherOperationStatus status = operation.Status;
-                        while (status != DispatcherOperationStatus.Completed)
-                        {
-                            status = operation.Wait(TimeSpan.FromMilliseconds(100));
-                        }
-                    };
-                    new Thread(start).Start();
+                    UpdateTextThread(message);
                 }
                 else if (message.IndexOf("PING :tmi.twitch.tv") == 0)
                 {
@@ -133,6 +135,21 @@ namespace Twitch_Chat
                     }
                 }
             }
+        }
+
+        private void UpdateTextThread(string message)
+        {
+            ThreadStart start = delegate ()
+            {
+                DispatcherOperation operation = Dispatcher.BeginInvoke(DispatcherPriority.Normal,
+                  new Action<string>(UpdateText), message);
+                DispatcherOperationStatus status = operation.Status;
+                while (status != DispatcherOperationStatus.Completed)
+                {
+                    status = operation.Wait(TimeSpan.FromMilliseconds(100));
+                }
+            };
+            new Thread(start).Start();
         }
 
         private void UpdateText(string message)

@@ -62,6 +62,11 @@ namespace Twitch_Chat
             bool success = false;
             string buffer;
 
+            if(_stream == null)
+            {
+                await Connect();
+            }
+
             if (_channel != "")
             {
                 if (await Send($"PART #{_channel}\r\n"))
@@ -80,11 +85,6 @@ namespace Twitch_Chat
                     success = true;
                     _channel = channelName;
                 }
-            }
-
-            if(await Send("CAP REQ :twitch.tv/membership"))
-            {
-                buffer = await Receive();
             }
 
             return success;
